@@ -1,17 +1,83 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <limits.h>
+
+#define MAX_EXPRESSION_LENGTH 512
+
+
+typedef enum {
+    SUCCESS = 0,
+    ERROR_MEMORY_ALLOCATION_FAILED,
+    ERROR_FAILED_TO_READ_INPUT,
+    ERROR_EXPRESSION_MAX_LENGTH_EXCEEDED,
+    ERROR_INVALID_EXPRESSION,
+    ERROR_OVERFLOW_INTEGER,
+    ERROR_DIVISION_BY_ZERO,
+} StatusCode;
+
+void printStatusMessage(StatusCode code) {
+    switch(code) {
+        case SUCCESS:
+            printf("Success\n");
+            break;
+        case ERROR_MEMORY_ALLOCATION_FAILED:
+            printf("Error: Memory allocation failed\n");
+            break;
+        case ERROR_FAILED_TO_READ_INPUT:
+            printf("Error: Failed to read input\n");
+            break;
+        case ERROR_EXPRESSION_MAX_LENGTH_EXCEEDED:
+            printf("Error: Expression max length exceeded, allow max is %d\n", MAX_EXPRESSION_LENGTH - 2);
+            break;
+        case ERROR_INVALID_EXPRESSION:
+            printf("Error: Invalid expression\n");
+            break;
+        case ERROR_OVERFLOW_INTEGER:
+            printf("Error: Integer overflow\n");
+            break;
+        case ERROR_DIVISION_BY_ZERO:
+            printf("Error: Division by zero\n");
+            break;
+        default:
+            printf("Error: Unknown error code\n");
+    }
+}
+
 
 char* input(char* prompt) {
-    printf("%s", prompt);
-    char* string = NULL;
-    scanf("%m[^\n]s", &string);
+    if(prompt != NULL) {
+        printf("%s", prompt);
+    }
+
+    char* string = (char*)malloc(sizeof(char) * MAX_EXPRESSION_LENGTH);
+    if(string == NULL) {
+        printStatusMessage(ERROR_MEMORY_ALLOCATION_FAILED);
+        exit(1);
+    }
+    
+    if(fgets(string, MAX_EXPRESSION_LENGTH, stdin) == NULL) {
+        printStatusMessage(ERROR_FAILED_TO_READ_INPUT);
+        free(string);
+        exit(1);
+    }
+
+    size_t len = strlen(string);
+    
+    if(len == MAX_EXPRESSION_LENGTH-1 && string[len - 1] != '\n') {
+        free(string);
+        printStatusMessage(ERROR_EXPRESSION_MAX_LENGTH_EXCEEDED);
+        exit(1);
+    }
+
+    if(len > 0 && string[len - 1] == '\n') {
+        string[len - 1] = '\0';
+    }
+
     return string;
 }
 
-int isDigit(char c) {
-    return c >= '0' && c <= '9';
-}
 
 int operatorPrecedence(char op) {
     switch (op) {
@@ -26,32 +92,53 @@ int operatorPrecedence(char op) {
     }
 }
 
-int applyOperator(double a, double b, char op, double* result) {
+StatusCode applyOperator(long long a, long long b, char op, int* result) {
+    long long tempResult;
+
     switch(op) {
         case '+':
-            *result = a + b;
-            return 0;
+            tempResult = a + b;
+            break;
         case '-':
-            *result = a - b;
-            return 0;
+            tempResult = a - b;
+            break;
         case '*':
-            *result = a * b;
-            return 0;
+            tempResult = a * b;
+            break;
         case '/':
-            if (b == 0) return 1;
-            *result = a / b;
-            return 0;
+            if (b == 0) return ERROR_DIVISION_BY_ZERO;
+            tempResult = a / b;
+            break;
         default:
-            return 1;
+            return ERROR_INVALID_EXPRESSION;
     }
+
+    if(tempResult > INT_MAX || tempResult < INT_MIN) {
+        return ERROR_OVERFLOW_INTEGER;
+    }
+
+    *result = (int)tempResult;
+    return SUCCESS;
 }
 
 
-int evaluateExpression(char* expression, double* result) {
+
+StatusCode evaluateExpression(char* expression, int* result) {
     const int size = strlen(expression);
 
-    double* values = (double*)malloc(sizeof(double) * size);
+    int* values = (int*)malloc(sizeof(int) * size);
+    if(values == NULL) {
+        free(values);
+        return ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+
     char* operators = (char*)malloc(sizeof(char) * size);
+    if(operators == NULL) {
+        free(values);
+        free(operators);
+        return ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+
     int valuesTop = -1, operatorsTop = -1;
 
     for(int i=0; i<size; i++) {
@@ -59,68 +146,102 @@ int evaluateExpression(char* expression, double* result) {
 
         if(ch == ' ') continue;
 
-        if(isDigit(ch)) {
-            double num = 0;
-            while(i < size && isDigit(expression[i])) {
+        if(isdigit(ch)) {
+            long long num = 0;
+            while(i < size && isdigit(expression[i])) {
                 num = num * 10 + (expression[i] - '0');
                 i += 1;
+
+                if(num > INT_MAX) {
+                    free(values);
+                    free(operators);
+                    return ERROR_OVERFLOW_INTEGER;
+                }
             }
 
-            values[++valuesTop] = num;
+            values[++valuesTop] = (int)num;
             i -= 1;
             continue;
         }
 
         if(operatorPrecedence(ch) == 0) {
-            printf("Error: Invalid expression.\n");
-            return 1;
+            free(values);
+            free(operators);
+            return ERROR_INVALID_EXPRESSION;
         }
 
         while(
             operatorsTop >= 0 && 
             operatorPrecedence(ch) <= operatorPrecedence(operators[operatorsTop])
         ) {
-            double b = values[valuesTop--];
-            double a = values[valuesTop--];
+            if(valuesTop < 1) {
+                free(values);
+                free(operators);
+                return ERROR_INVALID_EXPRESSION;
+            }
+
+            int b = values[valuesTop--];
+            int a = values[valuesTop--];
             char operator = operators[operatorsTop--];
 
-            int error = applyOperator(a, b, operator, &values[++valuesTop]);
-            if(error == 1) return 1;
+            StatusCode status = applyOperator(a, b, operator, &values[++valuesTop]);
+
+            if(status != SUCCESS) {
+                free(values);
+                free(operators);
+                return status;
+            }
         }
 
         operators[++operatorsTop] = ch;
     }
     
     while(operatorsTop >= 0) {
-        double b = values[valuesTop--];
-        double a = values[valuesTop--];
+        if(valuesTop < 1) {
+            free(values);
+            free(operators);
+            return ERROR_INVALID_EXPRESSION;
+        }
+
+        int b = values[valuesTop--];
+        int a = values[valuesTop--];
         char operator = operators[operatorsTop--];
         
-        int error = applyOperator(a, b, operator, &values[++valuesTop]);
-        if(error == 1) return 1;
+        StatusCode status = applyOperator(a, b, operator, &values[++valuesTop]);
+        if(status != SUCCESS) {
+            free(values);
+            free(operators);
+            return status;
+        }
     }
     
+    if(valuesTop != 0) {
+        free(values);
+        free(operators);
+        return ERROR_INVALID_EXPRESSION;
+    }
+
     *result = values[0];
 
     free(values);
     free(operators);
 
-    return 0;
+    return SUCCESS;
 }
 
 
 int main() {
     char* expression = input("Enter you expression: ");
 
-    double result = 0;
-    int error = evaluateExpression(expression, &result);
+    int result = 0;
+    StatusCode status = evaluateExpression(expression, &result);
 
-    if(error == 1) {
-        printf("Error: Expression evaluation was failed.\n");
-        return 0;
+    if(status == SUCCESS) {
+        printf("Result: %d\n", result);
+    } else {
+        printStatusMessage(status);
     }
 
-    printf("Result: %.2lf\n", result);
-
+    free(expression);
     return 0;
 }
