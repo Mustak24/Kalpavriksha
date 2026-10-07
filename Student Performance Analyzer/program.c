@@ -32,7 +32,7 @@ char getGrade(float average) {
     return 'F';
 }
 
-const char* getPerformanceStarts(char grade) {
+const char* getPerformanceStars(char grade) {
     switch(grade) {
         case 'A': return "*****";
         case 'B': return "****";
