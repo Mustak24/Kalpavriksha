@@ -75,18 +75,23 @@ const char* getPerformanceStars(char grade) {
     }
 }
 
-void printStudentDetails(const Student* student) {
-    printf("Roll: %u\n", student->rollNumber);
-    printf("Name: %s\n", student->name);
-    printf("Total: %.2f\n", getTotalMarks(student));
+void printStudents(const Student* students, size_t count) {
+    printf("\nStudent Details:\n");
 
-    const float average = getAverageMarks(student);
-    printf("Average: %.2f\n", average);
+    for(size_t index=0; index<count; index++) {
+        printf("\n");
 
-    const char grade = getGrade(average);
-    printf("Grade: %c\n", grade);
-
-    if(grade != 'F') {   
+        printf("Roll: %u\n", students[index].rollNumber);
+        printf("Name: %s\n", students[index].name);
+        printf("Total: %.2f\n", getTotalMarks(&students[index]));
+    
+        const float average = getAverageMarks(&students[index]);
+        printf("Average: %.2f\n", average);
+    
+        const char grade = getGrade(average);
+        printf("Grade: %c\n", grade);
+    
+        if(grade == 'F') continue;
         printf("Performance: %s\n", getPerformanceStars(grade));
     }
 }
@@ -147,23 +152,7 @@ int main() {
         }
     }
 
-    printf("\nStudent Details:\n");
-    for(size_t index=0; index<studentCount; index++) {
-        printf("\n");
-
-        printf("Roll: %u\n", students[index].rollNumber);
-        printf("Name: %s\n", students[index].name);
-        printf("Total: %.2f\n", getTotalMarks(&students[index]));
-
-        const float average = getAverageMarks(&students[index]);
-        printf("Average: %.2f\n", average);
-
-        const char grade = getGrade(average);
-        printf("Grade: %c\n", grade);
-
-        if(grade == 'F') continue;
-        printf("Performance: %s\n", getPerformanceStars(grade));
-    }
+    printStudents(students, studentCount);
 
     printf("\nList of Roll Numbers (via recursion): ");
     printRollNumbers(students, studentCount);
