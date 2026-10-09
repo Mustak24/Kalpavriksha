@@ -11,6 +11,7 @@
 #define NUMBER_OF_MARKS 3
 #define STUDENT_MIN_MARKS 0.0f
 #define STUDENT_MAX_MARKS 100.0f
+#define STUDENT_NAME_MAX_SIZE 50
 
 #define GRADE_A_MIN_MARKS 85.0f
 #define GRADE_B_MIN_MARKS 70.0f
@@ -20,12 +21,12 @@
 
 typedef struct Student {
     unsigned int rollNumber;
-    char name[50];
+    char name[STUDENT_NAME_MAX_SIZE];
     float marks[NUMBER_OF_MARKS];
 } Student;
 
 
-bool isValidMarks(float marks[NUMBER_OF_MARKS]) {
+bool isValidMarks(const float marks[NUMBER_OF_MARKS]) {
     for(int index=0; index<NUMBER_OF_MARKS; index++) {
         if(
             !isfinite(marks[index]) || 
@@ -75,6 +76,52 @@ const char* getPerformanceStars(char grade) {
     }
 }
 
+
+int readStudents(Student* students, size_t studentCount) {
+    printf("Enter %zu students details:\n", studentCount);
+
+    char inputFormat[BUFFER_MAX_SIZE];
+    int result = snprintf(
+        inputFormat,
+        BUFFER_MAX_SIZE,
+        "%%u %%%ds %%f %%f %%f",
+        STUDENT_NAME_MAX_SIZE-1
+    );
+
+    if(result < 0) {
+        printf("Error: unable to generate input formatter.\n");
+        return 1;
+    }
+
+    for(size_t index = 0; index < studentCount; index++) {
+        char buffer[BUFFER_MAX_SIZE];
+        if(!fgets(buffer, sizeof(buffer), stdin)) {
+            printf("Error reading input.\n");
+            return 1;
+        }
+
+        if(
+            sscanf(
+                buffer, 
+                inputFormat,
+                &students[index].rollNumber, 
+                students[index].name, 
+                &students[index].marks[0], &students[index].marks[1], &students[index].marks[2]
+            ) != 5
+        ) {
+            printf("Invalid input format for student %zu. Please enter: rollNumber name mark1 mark2 mark3\n", index + 1);
+            return 1;
+        }
+
+        if(!isValidMarks(students[index].marks)) {
+            printf("Invalid marks for student %zu. Marks must be between %.1f and %.1f.\n", index + 1, STUDENT_MIN_MARKS, STUDENT_MAX_MARKS);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 void printStudents(const Student* students, size_t count) {
     printf("\nStudent Details:\n");
 
@@ -122,34 +169,11 @@ int main() {
         return 1;
     }
 
-    printf("Enter %zu students details:\n", studentCount);
-    for(size_t index = 0; index < studentCount; index++) {
-        char buffer[BUFFER_MAX_SIZE];
-        if(!fgets(buffer, sizeof(buffer), stdin)) {
-            printf("Error reading input.\n");
-            free(students);
-            return 1;
-        }
-
-        if(
-            sscanf(
-                buffer, 
-                "%u %49s %f %f %f", 
-                &students[index].rollNumber, 
-                students[index].name, 
-                &students[index].marks[0], &students[index].marks[1], &students[index].marks[2]
-            ) != 5
-        ) {
-            printf("Invalid input format for student %zu. Please enter: rollNumber name mark1 mark2 mark3\n", index + 1);
-            free(students);
-            return 1;
-        }
-
-        if(!isValidMarks(students[index].marks)) {
-            printf("Invalid marks for student %zu. Marks must be between %.1f and %.1f.\n", index + 1, STUDENT_MIN_MARKS, STUDENT_MAX_MARKS);
-            free(students);
-            return 1;
-        }
+    int error = readStudents(students, studentCount);
+    if(error != 0) {
+        printf("Error: Unable to read students.\n");
+        free(students);
+        return 1;
     }
 
     printStudents(students, studentCount);
