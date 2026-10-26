@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <ctype.h>
+#include <limits.h>
 
 #define NAME_MAX_LEN 50
 #define DESIGNATION_MAX_LEN 50
@@ -12,6 +14,7 @@ typedef struct Employee {
     char* name;
     char* designation;
 
+    struct Employee* manager;
     struct Employee** subordinates;
     size_t subordinatesCount;
 } Employee;
@@ -24,12 +27,13 @@ Employee* initializeNewEmployee() {
     Employee* employee = (Employee*)malloc(sizeof(Employee));
     if(employee == NULL) {
         printf("Error: Failed to allocate memory");
-        exit(1);
+        return NULL;
     }
 
     employee->id = 0;
     employee->name = NULL;
     employee->designation = NULL;
+    employee->manager = NULL;
     employee->subordinates = NULL;
     employee->subordinatesCount = 0;
 
@@ -37,11 +41,14 @@ Employee* initializeNewEmployee() {
 }
 
 
-void destroyEmployeeTree(Employee* employee) {
+
+void destroyEmployeeTree(Employee* employee, bool deepDestroy) {
     if(employee == NULL) return;
 
-    for(size_t i = 0; i < employee->subordinatesCount; i++) {
-        destroyEmployeeTree(employee->subordinates[i]);
+    if(deepDestroy) {
+        for(size_t i = 0; i < employee->subordinatesCount; i++) {
+            destroyEmployeeTree(employee->subordinates[i], deepDestroy);
+        }
     }
 
     free(employee->name);
@@ -68,17 +75,6 @@ int displayEmployeeTree(Employee* employee, int level) {
     return count;
 }
 
-
-
-Employee* findManagerOfSearchFunction(Employee* employee, unsigned int targetEmployeeId) {
-    if(employee == NULL) return NULL;
-    for(size_t index = 0; index < employee->subordinatesCount; index++) {
-        if(employee->subordinates[index]->id == targetEmployeeId) {
-            return employee;
-        }
-    }
-    return NULL;
-}
 
 Employee* findEmployeeByIdSearchFunction(Employee* employee, unsigned int targetEmployeeId) {
     if(employee != NULL && employee->id == targetEmployeeId) {
@@ -108,10 +104,14 @@ Employee* searchInEmployeeTree(
 }
 
 
-void addEmployeeInEmployeeTree(Employee* employeeTree, Employee* employee, unsigned int managerId) {
-    if(employeeTree == NULL) return;
+int addEmployeeInEmployeeTree(Employee* employeeTree, Employee* employee, unsigned int managerId) {
+    if(employeeTree == NULL) return 1;
 
     Employee* manager = searchInEmployeeTree(employeeTree, managerId, findEmployeeByIdSearchFunction);
+    if(manager == NULL) {
+        printf("Error: Manager with id %u does not exist\n", managerId);
+        return 1;
+    }
 
     Employee** temp = realloc(
         manager->subordinates, 
@@ -120,80 +120,83 @@ void addEmployeeInEmployeeTree(Employee* employeeTree, Employee* employee, unsig
 
     if(temp == NULL) {
         printf("Error: failed to reallocate memory\n");
-        exit(1);
+        return 1;
     }
 
     manager->subordinates = temp;
+    employee->manager = manager;
     manager->subordinates[manager->subordinatesCount++] = employee;
+    return 0;
 }
 
 
-void removeEmployeeFromEmployeeTree(Employee* employeeTree, unsigned int employeeId) {
-    if(employeeTree == NULL) return;
+int removeEmployeeFromEmployeeTree(Employee* employeeTree, unsigned int employeeId) {
+    if(employeeTree == NULL) return 1;
 
-    Employee* manager = searchInEmployeeTree(employeeTree, employeeId, findManagerOfSearchFunction);
-    if(manager == NULL) {
-        printf("Error: Cannot remove top hierarchy employee\n");
-        return;
-    }
-
+    
     Employee* employeeToRemove = searchInEmployeeTree(employeeTree, employeeId, findEmployeeByIdSearchFunction);
     if(employeeToRemove == NULL) {
         printf("Error: Employee with id %u does not exist\n", employeeId);
-        return;
+        return 1;
+    }
+    
+    Employee* manager = employeeToRemove->manager;
+    if(manager == NULL) {
+        printf("Error: Cannot remove top hierarchy employee\n");
+        return 1;
+    }
+
+    if(employeeToRemove->subordinatesCount > 0) {
+        Employee* minSubordinatesEmployee = NULL;
+        for(size_t i = 0; i < manager->subordinatesCount; i++) {
+            if(manager->subordinates[i]->id == employeeId) continue;
+            
+            Employee* subordinate = manager->subordinates[i];
+            if(minSubordinatesEmployee == NULL || subordinate->subordinatesCount < minSubordinatesEmployee->subordinatesCount) {
+                minSubordinatesEmployee = subordinate;
+            }
+        }
+
+        if(minSubordinatesEmployee == NULL) {
+            minSubordinatesEmployee = manager;
+        }
+
+        Employee** temp = realloc(
+            minSubordinatesEmployee->subordinates, 
+            (minSubordinatesEmployee->subordinatesCount + employeeToRemove->subordinatesCount) * sizeof(Employee*)
+        );
+
+        if(temp == NULL) {
+            printf("Error: failed to reallocate memory\n");
+            return 1;
+        }
+
+        minSubordinatesEmployee->subordinates = temp;
+
+        for(size_t i = 0; i < employeeToRemove->subordinatesCount; i++) {
+            employeeToRemove->subordinates[i]->manager = minSubordinatesEmployee;
+            minSubordinatesEmployee->subordinates[minSubordinatesEmployee->subordinatesCount++] = employeeToRemove->subordinates[i];
+        }
     }
 
     for (size_t index = 0; index < manager->subordinatesCount; index++) {
         if (manager->subordinates[index]->id == employeeId) {
-            manager->subordinates[index] = manager->subordinates[manager->subordinatesCount - 1];
+            for (size_t j = index + 1; j < manager->subordinatesCount; j++) {
+                manager->subordinates[j - 1] = manager->subordinates[j];
+            }
+
             manager->subordinatesCount--;
             break;
         }
     }
-    
 
-    if(employeeToRemove->subordinatesCount == 0) {
-        goto REMOVE_EMPLOYEE_CLEANUP;
+    if(manager->subordinatesCount == 0) {
+        free(manager->subordinates);
+        manager->subordinates = NULL;
     }
 
-    Employee* minSubordinatesEmployee = NULL;
-    for(size_t i = 0; i < manager->subordinatesCount; i++) {
-        Employee* subordinate = manager->subordinates[i];
-        if(minSubordinatesEmployee == NULL || subordinate->subordinatesCount < minSubordinatesEmployee->subordinatesCount) {
-            minSubordinatesEmployee = subordinate;
-        }
-    }
-
-    if(minSubordinatesEmployee == NULL) {
-        minSubordinatesEmployee = manager;
-    }
-
-    Employee** temp = realloc(
-        minSubordinatesEmployee->subordinates, 
-        (minSubordinatesEmployee->subordinatesCount + employeeToRemove->subordinatesCount) * sizeof(Employee*)
-    );
-
-    if(temp == NULL) {
-        printf("Error: failed to reallocate memory\n");
-        exit(1);
-    }
-
-    minSubordinatesEmployee->subordinates = temp;
-
-    for(size_t i = 0; i < employeeToRemove->subordinatesCount; i++) {
-        minSubordinatesEmployee->subordinates[minSubordinatesEmployee->subordinatesCount++] = employeeToRemove->subordinates[i];
-    }
-
-    REMOVE_EMPLOYEE_CLEANUP:
-        if(manager->subordinatesCount == 0) {
-            free(manager->subordinates);
-            manager->subordinates = NULL;
-        }
-
-        free(employeeToRemove->name);
-        free(employeeToRemove->designation);
-        free(employeeToRemove->subordinates);
-        free(employeeToRemove);
+    destroyEmployeeTree(employeeToRemove, false);
+    return 0;
 }
 
 
@@ -202,6 +205,25 @@ void clearInputBuffer() {
     while((c = getchar()) != '\n' && c != EOF);
 }
 
+char* trimString(char* str) {
+    if(str == NULL) return NULL;
+
+    char* start = str;
+    while(isspace(*start)) start++;
+
+    if(*start == '\0') {
+        *str = '\0';
+        return str;
+    }
+
+    char* end = start + strlen(start) - 1;
+    while(end > start && isspace(*end)) end--;
+
+    *(end + 1) = '\0';
+
+    memmove(str, start, end - start + 2);
+    return str;
+}
 
 char* readStringInput(const char* prompt, int maxBufferSize) {
     if(prompt != NULL) {
@@ -211,20 +233,25 @@ char* readStringInput(const char* prompt, int maxBufferSize) {
     char* inputBuffer = (char*)malloc(maxBufferSize * sizeof(char));
     if(inputBuffer == NULL) {
         printf("Error: failed to allocate memory");
-        exit(1);
+        return NULL;
     }
 
     if(fgets(inputBuffer, maxBufferSize, stdin) == NULL) {
         printf("Error: Unable to read input string\n");
-        exit(1);
+        free(inputBuffer);
+        return NULL;
     }
 
-    size_t inputLength = strlen(inputBuffer);
-
-    if(inputLength > 0 && inputBuffer[inputLength-1] == '\n') {
-        inputBuffer[inputLength-1] = '\0';
-    } else {   
+    if(inputBuffer[strlen(inputBuffer) - 1] != '\n') {
         clearInputBuffer();
+    }
+
+    trimString(inputBuffer);
+
+    if(strlen(inputBuffer) == 0) {
+        printf("Warning, please enter a valid string: ");
+        free(inputBuffer);
+        return readStringInput(NULL, maxBufferSize);
     }
 
     return inputBuffer;
@@ -236,8 +263,8 @@ unsigned int readEmployeeId(const char* prompt) {
         printf("%s", prompt);
     }
 
-    int id;
-    while((scanf("%d", &id) != 1) || id < 0) {
+    long int id;
+    while((scanf("%ld", &id) != 1) || id < 0 || id > UINT_MAX) {
         printf("Warning, please enter a valid id: ");
         clearInputBuffer();
     }
@@ -247,7 +274,7 @@ unsigned int readEmployeeId(const char* prompt) {
 }
 
 
-void readEmployeeDetails(
+int readEmployeeDetails(
     unsigned int* id,
     char** name,
     char** designation,
@@ -260,7 +287,16 @@ void readEmployeeDetails(
     }
 
     *name = readStringInput("NAME: ", NAME_MAX_LEN);
+    if(*name == NULL) {
+        printf("Error: Unable to read employee name\n");
+        return 1;
+    }
+
     *designation = readStringInput("DESIGNATION: ", DESIGNATION_MAX_LEN);
+    if(*designation == NULL) {
+        printf("Error: Unable to read employee designation\n");
+        return 1;
+    }
 
     if(managerId != NULL) {
         *managerId = readEmployeeId("MANAGER ID: ");
@@ -269,11 +305,17 @@ void readEmployeeDetails(
             *managerId = readEmployeeId(NULL);
         }
     }
+
+    return 0;
 }
 
 
 void handleAddEmployee() {
     Employee* employee = initializeNewEmployee();
+    if(employee == NULL) {
+        printf("Error: Failed to initialize new employee\n");
+        return;
+    }
 
     bool isTopHierarchyFlow = EMPLOYEE_TREE == NULL;
     if(isTopHierarchyFlow) {
@@ -283,18 +325,31 @@ void handleAddEmployee() {
     }
 
     unsigned int managerId;
-    readEmployeeDetails(
+    int error = readEmployeeDetails(
         &employee->id,
         &employee->name,
         &employee->designation,
         isTopHierarchyFlow ? NULL : &managerId
     );
 
+    if(error != 0) {
+        printf("Error: Unable to read employee details\n");
+        destroyEmployeeTree(employee, false);
+        return;
+    }
+
     if(isTopHierarchyFlow) {
         EMPLOYEE_TREE = employee;
     } else {
-        addEmployeeInEmployeeTree(EMPLOYEE_TREE, employee, managerId);
+        int error = addEmployeeInEmployeeTree(EMPLOYEE_TREE, employee, managerId);
+        if(error != 0) {
+            printf("Error: Failed to add employee with id %u\n", employee->id);
+            destroyEmployeeTree(employee, false);
+            return;
+        }
     }
+
+    printf("Employee with id %u added successfully\n", employee->id);
 }
 
 
@@ -306,7 +361,13 @@ void handleRemoveEmployee() {
         return;
     }
     
-    removeEmployeeFromEmployeeTree(EMPLOYEE_TREE, employeeId);
+    int error = removeEmployeeFromEmployeeTree(EMPLOYEE_TREE, employeeId);
+    if(error != 0) {
+        printf("Error: Failed to remove employee with id %u\n", employeeId);
+        return;
+    }
+
+    printf("Employee with id %u removed successfully\n", employeeId);
 }
 
 
@@ -345,7 +406,7 @@ void handleExit() {
     printf("\n-----EXIT-----\n");
 
     if(EMPLOYEE_TREE != NULL) {
-        destroyEmployeeTree(EMPLOYEE_TREE);
+        destroyEmployeeTree(EMPLOYEE_TREE, true);
         EMPLOYEE_TREE = NULL;
     }
 }
