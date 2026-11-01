@@ -4,12 +4,10 @@
 
 #define MATRIX_MIN_SIZE 2
 #define MATRIX_MAX_SIZE 10
-
 #define MATRIX_MIN_VALUE 0
 #define MATRIX_MAX_VALUE 255
 
 #define FILTER_SIZE 3
-
 
 
 void seedTime() {
@@ -36,9 +34,7 @@ void destroyMatrix(int** matrix, int size) {
     if(matrix == NULL) return;
 
     for(int row = 0; row < size; row++) {
-        if(*(matrix + row) != NULL) {
-            free(*(matrix + row));
-        }
+        free(*(matrix + row));
     }
 
     free(matrix);
@@ -88,6 +84,7 @@ void displayMatrix(int** matrix, int size) {
     }
 }
 
+
 void reverseArray(int* arr, int size) {
     int start = 0, end = size - 1;
     while(start < end) {
@@ -98,6 +95,11 @@ void reverseArray(int* arr, int size) {
 }
 
 void rotateMatrix90(int** matrix, int size) {
+    if(matrix == NULL || size < MATRIX_MIN_SIZE || size > MATRIX_MAX_SIZE) {
+        printf("Invalid matrix provided for rotation.\n");
+        return;
+    }
+    
     for(int row = 0; row < size; row++) {
         for(int col = row + 1; col < size; col++) {
             swap(
@@ -114,29 +116,22 @@ void rotateMatrix90(int** matrix, int size) {
 
 
 
-int rowSmoothingFilterFunction(
-    int* previousRow, 
-    int* currentRow, 
-    int* nextRow, 
+int calSmoothingFilterVal(
+    int* filterRows[FILTER_SIZE],
     int rowSize,
     int filterApplyIndex
 ) {
+    int offset = FILTER_SIZE / 2;
     int sum = 0, count = 0;
     
     for(int row = 0; row < FILTER_SIZE; row++) {
-        for(int col = filterApplyIndex - 1; col <= filterApplyIndex + 1; col++) {
+        if(*(filterRows + row) == NULL) continue;
+
+        for(int col = filterApplyIndex - offset; col <= filterApplyIndex + offset; col++) {
             if(col < 0 || col >= rowSize) continue;
 
-            if(row == 0 && previousRow != NULL) {
-                sum += *(previousRow + col);
-                count++;
-            } else if(row == 1 && currentRow != NULL) {
-                sum += *(currentRow + col);
-                count++;
-            } else if(row == 2 && nextRow != NULL) {
-                sum += *(nextRow + col);
-                count++;
-            }
+            sum += *(*(filterRows + row) + col);
+            count++;
         }
     }
     
@@ -152,50 +147,45 @@ void applySmoothingFilterOnMatrix(int** matrix, int size) {
 
     int* previousRow = (int*)malloc(size * sizeof(int));
     int* currentRow = (int*)malloc(size * sizeof(int));
-    int* nextRow = (int*)malloc(size * sizeof(int));
 
-    if(previousRow == NULL || currentRow == NULL || nextRow == NULL) {
+    if(previousRow == NULL || currentRow == NULL) {
         printf("Memory allocation failed for filter application.\n");
         free(previousRow);
         free(currentRow);
-        free(nextRow);
         return;
     }
 
     for(int colIndex = 0; colIndex < size; colIndex++) {
         *(previousRow + colIndex) = 0;
         *(currentRow + colIndex) = *(*(matrix + 0) + colIndex);
-        *(nextRow + colIndex) = *(*(matrix + 1) + colIndex);
     }
 
     for(int rowIndex = 0; rowIndex < size; rowIndex++) {
+        int* filterRows[FILTER_SIZE] = {
+            rowIndex > 0 ? previousRow : NULL, 
+            currentRow, 
+            (rowIndex + 1 < size) ? *(matrix + rowIndex + 1) : NULL
+        };
+
         for(int colIndex = 0; colIndex < size; colIndex++) {
-            int result = rowSmoothingFilterFunction(
-                rowIndex > 0 ? previousRow : NULL, 
-                currentRow, 
-                (rowIndex + 1 < size) ? nextRow : NULL,
+            *(*(matrix + rowIndex) + colIndex) = calSmoothingFilterVal(
+                filterRows,
                 size, 
                 colIndex
             );
-
-            *(*(matrix + rowIndex) + colIndex) = result;
         }
 
         for(int colIndex = 0; colIndex < size; colIndex++) {
             *(previousRow + colIndex) = *(currentRow + colIndex);
-            *(currentRow + colIndex) = *(nextRow + colIndex);
 
-            if(rowIndex + 2 < size) {
-                *(nextRow + colIndex) = *(*(matrix + rowIndex + 2) + colIndex);
-            } else {
-                *(nextRow + colIndex) = 0;
+            if(rowIndex + 1 < size) {
+                *(currentRow + colIndex) = *(*(matrix + rowIndex + 1) + colIndex);
             }
         }
     }
 
     free(previousRow);
     free(currentRow);
-    free(nextRow);
 }
 
 
