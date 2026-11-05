@@ -8,7 +8,6 @@
 
 #define MEMORY_BLOCK_MIN_SIZE 1
 #define MEMORY_BLOCK_MIN_ID 1
-#define DEFAULT_ALLOCATION_METHOD FIRST_FIT
 
 
 typedef enum MemoryAllocationMethod {
@@ -477,13 +476,10 @@ void handleMemoryAllocationMethodChange() {
 
 
 void handleMemoryPoolStatusDisplay() {
-
     int freeBlocks = 0, largestFreeBlockSize = 0;
-
    
     for(int index = 0; index < pool.memoryBlockCount; index++) {
         MemoryBlock block = pool.memoryBlocks[index];
-
         if(!block.isAllocated) freeBlocks++;
 
         if(!block.isAllocated && block.size > largestFreeBlockSize) {
@@ -527,7 +523,6 @@ void handleMemoryMapDisplay() {
                 block.startFrom
             );
         }
-        
     }
 
     printf("\n");
