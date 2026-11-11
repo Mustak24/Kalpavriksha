@@ -229,7 +229,10 @@ int searchAvailableMemorySpace(int size) {
 
 int searchBlockById(int targetBlockId) {
     for(int index = 0; index < pool.memoryBlockCount; index++) {
-        if(pool.memoryBlocks[index].id == targetBlockId) return index;
+        if(
+            pool.memoryBlocks[index].id == targetBlockId && 
+            pool.memoryBlocks[index].isAllocated
+        ) return index;
     }
     return -1;
 }
@@ -268,8 +271,8 @@ int addNewMemoryBlockInPool(int id, int size) {
     pool.memoryBlocks = tempMemoryBlocks;
     pool.memoryBlockCount += 1;
 
-    for(int index = insertIndex; index < pool.memoryBlockCount-1; index++) {
-        pool.memoryBlocks[index + 1] = pool.memoryBlocks[index];
+    for(int index = pool.memoryBlockCount-1; index > insertIndex; index--) {
+        pool.memoryBlocks[index] = pool.memoryBlocks[index -  1];
     }
 
     pool.memoryBlocks[insertIndex] = newBlock;
@@ -282,17 +285,19 @@ int addNewMemoryBlockInPool(int id, int size) {
 }
 
 
-int releaseMemoryBlockFromPool(int blockId) {
+bool releaseMemoryBlockFromPool(int blockId) {
     for(int index = 0; index < pool.memoryBlockCount; index++) {
-        if(pool.memoryBlocks[index].id == blockId) {
+        if(pool.memoryBlocks[index].id == blockId && pool.memoryBlocks[index].isAllocated) {
             pool.memoryBlocks[index].isAllocated = false;
+            pool.freeMemory += pool.memoryBlocks[index].size;
+
             mergePoolFreeBlocks();
-            return 0;
+            return true;
         }
     }
 
     printf("Error: memory block with the ID=%d not found.\n", blockId);
-    return 1;
+    return false;
 }
 
 
@@ -304,11 +309,9 @@ int resizeMemoryBlockInPool(int blockId, int newSize) {
     }
 
     int requiredSize = newSize - pool.memoryBlocks[targetBlockIndex].size;
+    if(requiredSize == 0) return 0;
 
-    if(requiredSize <= 0) {
-        pool.memoryBlocks[targetBlockIndex].size = newSize;
-        pool.freeMemory += -requiredSize;
-        pool.memoryBlockCount += 1;
+    if(requiredSize < 0) {
         MemoryBlock* tempNewMemoryBlocks = realloc(
             pool.memoryBlocks, 
             (pool.memoryBlockCount + 1) * sizeof(MemoryBlock)
@@ -318,10 +321,14 @@ int resizeMemoryBlockInPool(int blockId, int newSize) {
             printf("Error: failed to allocate memory for new memory block.\n");
             return 1;
         }
-
+        
         pool.memoryBlocks = tempNewMemoryBlocks;
 
-        for(int index = pool.memoryBlockCount; index > targetBlockIndex + 1; index--) {
+        pool.memoryBlocks[targetBlockIndex].size = newSize;
+        pool.freeMemory += (-requiredSize);
+        pool.memoryBlockCount += 1;
+
+        for(int index = pool.memoryBlockCount-1; index > targetBlockIndex+1; index--) {
             tempNewMemoryBlocks[index] = tempNewMemoryBlocks[index - 1];
         }
 
@@ -350,7 +357,11 @@ int resizeMemoryBlockInPool(int blockId, int newSize) {
         return 0;
     }
 
-    int newBlockIndex = addNewMemoryBlockInPool(pool.memoryBlocks[targetBlockIndex].id, newSize);
+    MemoryBlock targetBlock = pool.memoryBlocks[targetBlockIndex];
+    int newBlockIndex = addNewMemoryBlockInPool(
+        generateMemoryBlockId(), 
+        newSize
+    );
     if(newBlockIndex == -1) {
         printf("Error: failed to allocate new memory block for resizing with ID %d.\n", blockId);
         return 1;
@@ -358,11 +369,15 @@ int resizeMemoryBlockInPool(int blockId, int newSize) {
 
     memmove(
         pool.memoryBuffer + pool.memoryBlocks[newBlockIndex].startFrom,
-        pool.memoryBuffer + pool.memoryBlocks[targetBlockIndex].startFrom,
-        pool.memoryBlocks[targetBlockIndex].size
+        pool.memoryBuffer + targetBlock.startFrom,
+        targetBlock.size
     );
 
-    releaseMemoryBlockFromPool(pool.memoryBlocks[targetBlockIndex].id);
+    if(!releaseMemoryBlockFromPool(targetBlock.id)) {
+        printf("Error: failed to release old block\n");
+        return 1;
+    }
+
     mergePoolFreeBlocks();
     return 0;
 }
@@ -402,7 +417,7 @@ void handleMemoryRelease() {
         return;
     }
 
-    if(releaseMemoryBlockFromPool(id) != 0) {
+    if(!releaseMemoryBlockFromPool(id)) {
         printf("Error: failed to release memory block.\n");
         return;
     }
@@ -462,6 +477,11 @@ void handleMemoryAllocationMethodChange() {
             methodChoice != WORST_FIT
         )
     ) {
+        if(feof(stdin)) {
+            printf("Error: Input ended unexpectedly\n");
+            return;
+        }
+
         clearInputBuffer();
         printf("Invalid input. Please select valid option: ");
     }
@@ -544,6 +564,11 @@ int initializeMemoryPool() {
         pool.totalMemory < POOL_MIN_SIZE || 
         pool.totalMemory > POOL_MAX_SIZE
     ) {
+        if(feof(stdin)) {
+            printf("Error: Input ends unexpectedly\n");
+            return 1;
+        }
+
         printf("Invalid input. Please enter a valid memory pool size (%d-%d bytes): ", POOL_MIN_SIZE, POOL_MAX_SIZE);
     }
     
@@ -571,7 +596,10 @@ int initializeMemoryPool() {
 
 
 int main() {
-    initializeMemoryPool();
+    if(initializeMemoryPool() != 0) {
+        printf("Error: failed to initialized memory pool");
+        return 1;
+    }
 
     int choice;
     do {
@@ -584,7 +612,16 @@ int main() {
         printf("6. Change Allocation Method\n");
         printf("7. Exit\n");
         printf("Enter your choice: ");
-        scanf("%d", &choice);
+
+        while(scanf("%d", &choice) != 1) {
+            if(feof(stdin)) {
+                printf("Error: Input ended unexpectedly\n");
+                handleExit();
+            }
+
+            printf("Invalid input. Please select a valid option: ");
+            clearInputBuffer();
+        }
 
         clearInputBuffer();
 
