@@ -32,13 +32,13 @@ static bool insert(SortedList* self, void* value) {
         return true;
     }
 
-    SortedListNode* curr = self->head;
-    while(curr->next != NULL && self->compareValue(value, curr->next->data) <= 0) {
-        curr = curr->next;
+    SortedListNode* currentNode = self->head;
+    while(currentNode->next != NULL && self->compareValue(value, currentNode->next->data) <= 0) {
+        currentNode = currentNode->next;
     }
 
-    newNode->next = curr->next;
-    curr->next = newNode;
+    newNode->next = currentNode->next;
+    currentNode->next = newNode;
     self->size++;
 
     return true;
@@ -49,15 +49,15 @@ static void* peak(SortedList* self) {
     return self->head->data;
 }
 
-static void* get(SortedList* self, int index) {
-    if(self == NULL || index < 0 || index >= self->size) return NULL;
+static void* get(SortedList* self, int targetIndex) {
+    if(self == NULL || targetIndex < 0 || targetIndex >= self->size) return NULL;
 
-    SortedListNode* curr = self->head;
-    for(int i = 0; i < index && curr != NULL; i++) {
-        curr = curr->next;
+    SortedListNode* currentNode = self->head;
+    for(int nodeIndex = 0; nodeIndex < targetIndex && currentNode != NULL; nodeIndex++) {
+        currentNode = currentNode->next;
     }
 
-    return curr != NULL ? curr->data : NULL;
+    return currentNode != NULL ? currentNode->data : NULL;
 }
 
 SortedList* initSortedList(int dataTypeSize, int (*compareValue)(const void* value1, const void* value2)) {
@@ -81,15 +81,15 @@ SortedList* initSortedList(int dataTypeSize, int (*compareValue)(const void* val
 void destroySortedList(SortedList** list) {
     if(list == NULL || *list == NULL) return;
 
-    SortedListNode* curr = (*list)->head;
-    while(curr != NULL) {
-        SortedListNode* next = curr->next;
-        if(curr->data != NULL) {
-            free(curr->data);
-            curr->data = NULL;
+    SortedListNode* currentNode = (*list)->head;
+    while(currentNode != NULL) {
+        SortedListNode* nextNode = currentNode->next;
+        if(currentNode->data != NULL) {
+            free(currentNode->data);
+            currentNode->data = NULL;
         }
-        free(curr);
-        curr = next;
+        free(currentNode);
+        currentNode = nextNode;
     }
 
     free(*list);

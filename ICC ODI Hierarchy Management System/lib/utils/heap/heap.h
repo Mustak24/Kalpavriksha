@@ -15,7 +15,6 @@ typedef struct Heap {
     void* (*peak)(struct Heap* self);
 } Heap;
 
-
 Heap* initHeap(int capacity, int dataTypeSize, int (*compareValue)(const void* value1, const void* value2));
 void destroyHeap(Heap** heap);
 

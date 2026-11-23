@@ -5,10 +5,9 @@
 #include "heap.h"
 #include "common.h"
 
-
-static void* getNode(Heap* heap, int index) {
-    if(heap == NULL || index < 0 || index >= heap->capacity) return NULL;
-    return (char*)heap->data + (index * heap->dataTypeSize);
+static void* getNode(Heap* heap, int nodeIndex) {
+    if(heap == NULL || nodeIndex < 0 || nodeIndex >= heap->capacity) return NULL;
+    return (char*)heap->data + (nodeIndex * heap->dataTypeSize);
 }
 
 static void* peak(Heap* heap) {
@@ -16,13 +15,13 @@ static void* peak(Heap* heap) {
     return getNode(heap, 0);
 }
 
-static void bubbleDownHeap(Heap* heap, int index) {
-    if(heap == NULL || index < 0 || index >= heap->size) return;
+static void bubbleDownHeap(Heap* heap, int nodeIndex) {
+    if(heap == NULL || nodeIndex < 0 || nodeIndex >= heap->size) return;
 
     while(true) {
-        int leftIndex = index * 2 + 1;
-        int rightIndex = index * 2 + 2;
-        int targetIndex = index;
+        int leftIndex = nodeIndex * 2 + 1;
+        int rightIndex = nodeIndex * 2 + 2;
+        int targetIndex = nodeIndex;
 
         if(leftIndex < heap->size && heap->compareValue(getNode(heap, targetIndex), getNode(heap, leftIndex)) > 0) {
             targetIndex = leftIndex;
@@ -32,30 +31,30 @@ static void bubbleDownHeap(Heap* heap, int index) {
             targetIndex = rightIndex;
         }
 
-        if(targetIndex == index) return;
+        if(targetIndex == nodeIndex) return;
         
         swap(
-            getNode(heap, index), 
+            getNode(heap, nodeIndex), 
             getNode(heap, targetIndex), 
             heap->dataTypeSize
         );
 
-        index = targetIndex;
+        nodeIndex = targetIndex;
     }
 }
 
-static void bubbleUpHeap(Heap* heap, int index) {
-    if(heap == NULL || index < 0 || index >= heap->size) return;
+static void bubbleUpHeap(Heap* heap, int nodeIndex) {
+    if(heap == NULL || nodeIndex < 0 || nodeIndex >= heap->size) return;
 
-    while(index > 0) {
-        int parentIndex = (index - 1) / 2;
+    while(nodeIndex > 0) {
+        int parentIndex = (nodeIndex - 1) / 2;
 
-        void* currentNode = getNode(heap, index);
+        void* currentNode = getNode(heap, nodeIndex);
         void* parentNode = getNode(heap, parentIndex);
 
         if(heap->compareValue(parentNode, currentNode) > 0) {
             swap(currentNode, parentNode, heap->dataTypeSize);
-            index = parentIndex;
+            nodeIndex = parentIndex;
             continue;
         }
 

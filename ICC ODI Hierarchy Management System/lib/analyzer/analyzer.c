@@ -31,16 +31,16 @@ const char* getRoleName(ICCPlayerRole role) {
     }
 }
 
-bool parseRoleChoice(int choice, ICCPlayerRole* outRole) {
+bool parseRoleChoice(int roleChoice, ICCPlayerRole* outRole) {
     if(outRole == NULL) return false;
-    switch(choice) {
-        case 1:
+    switch(roleChoice) {
+        case ROLE_CHOICE_BATSMAN:
             *outRole = PLAYER_ROLE_BATSMAN;
             return true;
-        case 2:
+        case ROLE_CHOICE_BOWLER:
             *outRole = PLAYER_ROLE_BOWLER;
             return true;
-        case 3:
+        case ROLE_CHOICE_ALL_ROUNDER:
             *outRole = PLAYER_ROLE_ALL_ROUNDER;
             return true;
         default:
@@ -48,30 +48,30 @@ bool parseRoleChoice(int choice, ICCPlayerRole* outRole) {
     }
 }
 
-int comparePlayerByPerfIndexDesc(const void* a, const void* b) {
-    const ICCPlayer* p1 = (const ICCPlayer*)a;
-    const ICCPlayer* p2 = (const ICCPlayer*)b;
+int comparePlayerByPerfIndexDesc(const void* firstPlayerPtr, const void* secondPlayerPtr) {
+    const ICCPlayer* firstPlayer = (const ICCPlayer*)firstPlayerPtr;
+    const ICCPlayer* secondPlayer = (const ICCPlayer*)secondPlayerPtr;
 
-    if (p1->performanceIndex > p2->performanceIndex) return 1;
-    if (p1->performanceIndex < p2->performanceIndex) return -1;
+    if (firstPlayer->performanceIndex > secondPlayer->performanceIndex) return 1;
+    if (firstPlayer->performanceIndex < secondPlayer->performanceIndex) return -1;
 
-    return p1->id - p2->id;
+    return firstPlayer->id - secondPlayer->id;
 }
 
 static ICCTeam* findTeamById(ICCSystemContext* self, int teamId) {
     if(self == NULL || self->teamCount <= 0) return NULL;
 
-    int low = 0;
-    int high = self->teamCount - 1;
+    int lowIndex = 0;
+    int highIndex = self->teamCount - 1;
 
-    while(low <= high) {
-        int mid = low + (high - low) / 2;
-        if(self->teams[mid].id == teamId) {
-            return &self->teams[mid];
-        } else if(self->teams[mid].id < teamId) {
-            low = mid + 1;
+    while(lowIndex <= highIndex) {
+        int middleIndex = lowIndex + (highIndex - lowIndex) / 2;
+        if(self->teams[middleIndex].id == teamId) {
+            return &self->teams[middleIndex];
+        } else if(self->teams[middleIndex].id < teamId) {
+            lowIndex = middleIndex + 1;
         } else {
-            high = mid - 1;
+            highIndex = middleIndex - 1;
         }
     }
 
@@ -81,9 +81,9 @@ static ICCTeam* findTeamById(ICCSystemContext* self, int teamId) {
 static ICCTeam* findTeamByName(ICCSystemContext* self, const char* teamName) {
     if(self == NULL || teamName == NULL) return NULL;
 
-    for(int i = 0; i < self->teamCount; i++) {
-        if(strcmp(self->teams[i].name, teamName) == 0) {
-            return &self->teams[i];
+    for(int teamIndex = 0; teamIndex < self->teamCount; teamIndex++) {
+        if(strcmp(self->teams[teamIndex].name, teamName) == 0) {
+            return &self->teams[teamIndex];
         }
     }
 
@@ -93,13 +93,13 @@ static ICCTeam* findTeamByName(ICCSystemContext* self, const char* teamName) {
 static bool isPlayerIdExists(ICCSystemContext* self, int playerId) {
     if(self == NULL) return false;
 
-    for(int t = 0; t < self->teamCount; t++) {
-        for(int r = 0; r < TOTAL_ICC_PLAYERS_ROLES; r++) {
-            SortedListNode* curr = self->teams[t].players[r]->head;
-            while(curr != NULL) {
-                ICCPlayer* p = (ICCPlayer*)curr->data;
-                if(p->id == playerId) return true;
-                curr = curr->next;
+    for(int teamIndex = 0; teamIndex < self->teamCount; teamIndex++) {
+        for(int roleIndex = 0; roleIndex < TOTAL_ICC_PLAYERS_ROLES; roleIndex++) {
+            SortedListNode* currentNode = self->teams[teamIndex].players[roleIndex]->head;
+            while(currentNode != NULL) {
+                ICCPlayer* currentPlayer = (ICCPlayer*)currentNode->data;
+                if(currentPlayer->id == playerId) return true;
+                currentNode = currentNode->next;
             }
         }
     }
@@ -116,15 +116,15 @@ static bool addPlayerToTeam(ICCSystemContext* self, int teamId, const ICCPlayer*
     if(player->role < 0 || player->role >= TOTAL_ICC_PLAYERS_ROLES) return false;
 
     ICCPlayer newPlayer = *player;
-    strncpy(newPlayer.teamName, team->name, MAX_NAME_LEN - 1);
-    newPlayer.teamName[MAX_NAME_LEN - 1] = '\0';
+    strncpy(newPlayer.teamName, team->name, NAME_BUFFER_SIZE - 1);
+    newPlayer.teamName[NAME_BUFFER_SIZE - 1] = '\0';
     newPlayer.performanceIndex = calculatePerformanceIndex(
         newPlayer.role, newPlayer.battingAverage, newPlayer.strikeRate,
         newPlayer.wickets, newPlayer.economyRate
     );
 
-    bool inserted = team->players[newPlayer.role]->insert(team->players[newPlayer.role], &newPlayer);
-    if(!inserted) return false;
+    bool isInserted = team->players[newPlayer.role]->insert(team->players[newPlayer.role], &newPlayer);
+    if(!isInserted) return false;
 
     team->totalPlayers++;
     if(newPlayer.role == PLAYER_ROLE_BATSMAN || newPlayer.role == PLAYER_ROLE_ALL_ROUNDER) {
@@ -137,71 +137,76 @@ static bool addPlayerToTeam(ICCSystemContext* self, int teamId, const ICCPlayer*
 }
 
 ICCSystemContext* initICCSystem(void) {
-    ICCSystemContext* ctx = (ICCSystemContext*)malloc(sizeof(ICCSystemContext));
-    if(ctx == NULL) return NULL;
+    ICCSystemContext* systemContext = (ICCSystemContext*)malloc(sizeof(ICCSystemContext));
+    if(systemContext == NULL) return NULL;
 
-    ctx->teamCount = teamCount;
-    ctx->findTeamById = findTeamById;
-    ctx->findTeamByName = findTeamByName;
-    ctx->addPlayerToTeam = addPlayerToTeam;
-    ctx->isPlayerIdExists = isPlayerIdExists;
+    systemContext->teamCount = teamCount;
+    systemContext->findTeamById = findTeamById;
+    systemContext->findTeamByName = findTeamByName;
+    systemContext->addPlayerToTeam = addPlayerToTeam;
+    systemContext->isPlayerIdExists = isPlayerIdExists;
 
-    for(int i = 0; i < teamCount && i < MAX_TEAMS; i++) {
-        ctx->teams[i].id = i + 1;
-        strncpy(ctx->teams[i].name, teams[i], MAX_NAME_LEN - 1);
-        ctx->teams[i].name[MAX_NAME_LEN - 1] = '\0';
-        ctx->teams[i].totalPlayers = 0;
-        ctx->teams[i].averageBattingStrikeRate = 0.0f;
-        ctx->teams[i].totalBattingStrikeRate = 0.0f;
-        ctx->teams[i].battingCount = 0;
+    for(int teamIndex = 0; teamIndex < teamCount && teamIndex < MAX_TEAMS; teamIndex++) {
+        systemContext->teams[teamIndex].id = teamIndex + 1;
+        strncpy(systemContext->teams[teamIndex].name, teams[teamIndex], NAME_BUFFER_SIZE - 1);
+        systemContext->teams[teamIndex].name[NAME_BUFFER_SIZE - 1] = '\0';
+        systemContext->teams[teamIndex].totalPlayers = 0;
+        systemContext->teams[teamIndex].averageBattingStrikeRate = 0.0f;
+        systemContext->teams[teamIndex].totalBattingStrikeRate = 0.0f;
+        systemContext->teams[teamIndex].battingCount = 0;
 
-        for(int r = 0; r < TOTAL_ICC_PLAYERS_ROLES; r++) {
-            ctx->teams[i].players[r] = initSortedList(sizeof(ICCPlayer), comparePlayerByPerfIndexDesc);
+        for(int roleIndex = 0; roleIndex < TOTAL_ICC_PLAYERS_ROLES; roleIndex++) {
+            systemContext->teams[teamIndex].players[roleIndex] = initSortedList(sizeof(ICCPlayer), comparePlayerByPerfIndexDesc);
         }
     }
 
-    for(int i = 0; i < playerCount; i++) {
-        ICCTeam* team = ctx->findTeamByName(ctx, players[i].team);
+    for(int playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+        ICCTeam* team = systemContext->findTeamByName(systemContext, players[playerIndex].team);
         if(team == NULL) continue;
 
-        ICCPlayerRole role = PLAYER_ROLE_BATSMAN;
-        if(strcmp(players[i].role, "Batsman") == 0) {
-            role = PLAYER_ROLE_BATSMAN;
-        } else if(strcmp(players[i].role, "Bowler") == 0) {
-            role = PLAYER_ROLE_BOWLER;
-        } else if(strcmp(players[i].role, "All-rounder") == 0) {
-            role = PLAYER_ROLE_ALL_ROUNDER;
+        ICCPlayer initialPlayer;
+        initialPlayer.id = players[playerIndex].id;
+        strncpy(initialPlayer.name, players[playerIndex].name, NAME_BUFFER_SIZE - 1);
+        initialPlayer.name[NAME_BUFFER_SIZE - 1] = '\0';
+        strncpy(initialPlayer.teamName, team->name, NAME_BUFFER_SIZE - 1);
+        initialPlayer.teamName[NAME_BUFFER_SIZE - 1] = '\0';
+
+        if(strcmp(players[playerIndex].role, "Batsman") == 0) {
+            initialPlayer.role = PLAYER_ROLE_BATSMAN;
+        } else if(strcmp(players[playerIndex].role, "Bowler") == 0) {
+            initialPlayer.role = PLAYER_ROLE_BOWLER;
+        } else if(strcmp(players[playerIndex].role, "All-rounder") == 0) {
+            initialPlayer.role = PLAYER_ROLE_ALL_ROUNDER;
         }
 
-        ICCPlayer p;
-        p.id = players[i].id;
-        strncpy(p.name, players[i].name, MAX_NAME_LEN - 1);
-        p.name[MAX_NAME_LEN - 1] = '\0';
-        strncpy(p.teamName, team->name, MAX_NAME_LEN - 1);
-        p.teamName[MAX_NAME_LEN - 1] = '\0';
-        p.role = role;
-        p.totalRuns = players[i].totalRuns;
-        p.battingAverage = players[i].battingAverage;
-        p.strikeRate = players[i].strikeRate;
-        p.wickets = players[i].wickets;
-        p.economyRate = players[i].economyRate;
-        p.performanceIndex = calculatePerformanceIndex(role, p.battingAverage, p.strikeRate, p.wickets, p.economyRate);
+        initialPlayer.totalRuns = players[playerIndex].totalRuns;
+        initialPlayer.battingAverage = players[playerIndex].battingAverage;
+        initialPlayer.strikeRate = players[playerIndex].strikeRate;
+        initialPlayer.wickets = players[playerIndex].wickets;
+        initialPlayer.economyRate = players[playerIndex].economyRate;
+        initialPlayer.performanceIndex = calculatePerformanceIndex(
+            initialPlayer.role,
+            initialPlayer.battingAverage,
+            initialPlayer.strikeRate,
+            initialPlayer.wickets,
+            initialPlayer.economyRate
+        );
 
-        ctx->addPlayerToTeam(ctx, team->id, &p);
+        systemContext->addPlayerToTeam(systemContext, team->id, &initialPlayer);
     }
 
-    return ctx;
+    return systemContext;
 }
 
-void destroyICCSystem(ICCSystemContext** ctx) {
-    if(ctx == NULL || *ctx == NULL) return;
+void destroyICCSystem(ICCSystemContext** systemContext) {
+    if(systemContext == NULL || *systemContext == NULL) return;
 
-    for(int i = 0; i < (*ctx)->teamCount; i++) {
-        for(int r = 0; r < TOTAL_ICC_PLAYERS_ROLES; r++) {
-            destroySortedList(&((*ctx)->teams[i].players[r]));
+    for(int teamIndex = 0; teamIndex < (*systemContext)->teamCount; teamIndex++) {
+        for(int roleIndex = 0; roleIndex < TOTAL_ICC_PLAYERS_ROLES; roleIndex++) {
+            destroySortedList(&((*systemContext)->teams[teamIndex].players[roleIndex]));
         }
     }
 
-    free(*ctx);
-    *ctx = NULL;
+    free(*systemContext);
+    *systemContext = NULL;
 }

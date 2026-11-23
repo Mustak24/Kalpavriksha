@@ -14,7 +14,6 @@ bool readInt(int* result, int min, int max);
 bool readFloat(float* result, float min, float max);
 bool readString(char* buffer, int maxLen);
 
-
 int promptAndReadInt(const char* prompt, int min, int max);
 float promptAndReadFloat(const char* prompt, float min, float max);
 char* promptAndReadString(const char* prompt, int maxLen);

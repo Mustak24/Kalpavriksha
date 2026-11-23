@@ -6,6 +6,10 @@
 #include "commands.h"
 #include "common.h"
 
+#define MIN_MENU_CHOICE 1
+#define MAX_MENU_CHOICE 6
+
+
 static void printMenu(void) {
     printf("\n");
     printf("==============================================================================\n");
@@ -21,48 +25,52 @@ static void printMenu(void) {
 }
 
 int main(void) {
-    ICCSystemContext* ctx = initICCSystem();
-    if(ctx == NULL) {
+    ICCSystemContext* systemContext = initICCSystem();
+    if(systemContext == NULL) {
         fprintf(stderr, "Failed to initialize ICC ODI System!\n");
         return 1;
     }
 
-    bool running = true;
-    while(running) {
+    bool isProgramRunning = true;
+    while(isProgramRunning) {
         printMenu();
-        int choice = promptAndReadInt("Enter your choice: ", 1, 6);
+        int menuChoice = promptAndReadInt("Enter your choice: ", MIN_MENU_CHOICE, MAX_MENU_CHOICE);
 
         if(feof(stdin)) {
             printf("\nExiting program...\n");
             break;
         }
 
-        switch(choice) {
+        switch(menuChoice) {
             case 1:
-                handleAddPlayer(ctx);
+                handleAddPlayer(systemContext);
                 break;
             case 2:
-                handleDisplayTeamPlayer(ctx);
+                handleDisplayTeamPlayer(systemContext);
                 break;
             case 3:
-                handleDisplayTeamByStrikeRate(ctx);
+                handleDisplayTeamByStrikeRate(systemContext);
                 break;
             case 4:
-                handleDisplayTopKPlayer(ctx);
+                handleDisplayTopKPlayer(systemContext);
                 break;
             case 5:
-                handleDisplayRoleAcrossTeams(ctx);
+                handleDisplayRoleAcrossTeams(systemContext);
                 break;
             case 6:
                 printf("\nExiting ICC ODI Player Performance Analyzer. Goodbye!\n");
-                running = false;
+                isProgramRunning = false;
                 break;
             default:
-                printf("Invalid choice! Please select an option between 1 and 6.\n");
+                printf(
+                    "Invalid choice! Please select an option between %d and %d.\n", 
+                    MIN_MENU_CHOICE, 
+                    MAX_MENU_CHOICE
+                );
                 break;
         }
     }
 
-    destroyICCSystem(&ctx);
+    destroyICCSystem(&systemContext);
     return 0;
 }

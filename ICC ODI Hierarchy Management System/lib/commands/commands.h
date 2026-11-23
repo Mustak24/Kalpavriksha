@@ -3,11 +3,10 @@
 
 #include "analyzer.h"
 
-void handleAddPlayer(ICCSystemContext* ctx);
-void handleDisplayTeamPlayer(ICCSystemContext* ctx);
-void handleDisplayTeamByStrikeRate(ICCSystemContext* ctx);
-void handleDisplayTopKPlayer(ICCSystemContext* ctx);
-void handleDisplayRoleAcrossTeams(ICCSystemContext* ctx);
-void handleDisplayTopKPLayer(ICCSystemContext* ctx);
+void handleAddPlayer(ICCSystemContext* systemContext);
+void handleDisplayTeamPlayer(ICCSystemContext* systemContext);
+void handleDisplayTeamByStrikeRate(ICCSystemContext* systemContext);
+void handleDisplayTopKPlayer(ICCSystemContext* systemContext);
+void handleDisplayRoleAcrossTeams(ICCSystemContext* systemContext);
 
 #endif

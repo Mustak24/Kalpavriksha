@@ -6,7 +6,6 @@
 
 #include "common.h"
 
-
 void swap(void* value1, void* value2, int dataTypeSize) {
     if(value1 == NULL || value2 == NULL || dataTypeSize <= 0) return;
 
@@ -19,12 +18,10 @@ void swap(void* value1, void* value2, int dataTypeSize) {
     free(temp);
 }
 
-
 void clearInputBuffer(void) {
-    int ch;
-    while((ch = getchar()) != '\n' && ch != EOF);
+    int inputChar;
+    while((inputChar = getchar()) != '\n' && inputChar != EOF);
 }
-
 
 void trimString(char* string) {
     if(string == NULL) return;
@@ -32,27 +29,26 @@ void trimString(char* string) {
     size_t length = strlen(string);
     if(length == 0) return;
 
-    size_t start = 0;
-    while(start < length && isspace((unsigned char)string[start])) start++;
+    size_t startIndex = 0;
+    while(startIndex < length && isspace((unsigned char)string[startIndex])) startIndex++;
 
-    if (start == length) {
+    if (startIndex == length) {
         string[0] = '\0';
         return;
     }
 
-    size_t end = length - 1;
-    while (end > start && isspace((unsigned char)string[end])) {
-        end--;
+    size_t endIndex = length - 1;
+    while (endIndex > startIndex && isspace((unsigned char)string[endIndex])) {
+        endIndex--;
     }
 
-    size_t newLength = end - start + 1;
-    if (start > 0) {
-        memmove(string, string + start, newLength);
+    size_t newLength = endIndex - startIndex + 1;
+    if (startIndex > 0) {
+        memmove(string, string + startIndex, newLength);
     }
     
     string[newLength] = '\0';
 }
-
 
 char* readLine(void) {
     size_t lineLength = 0;
@@ -101,7 +97,6 @@ char* readLine(void) {
     return line;
 }
 
-
 bool readInt(int* result, int min, int max) {
     if(result == NULL) return false;
 
@@ -114,21 +109,20 @@ bool readInt(int* result, int min, int max) {
         return false;
     }
 
-    char* endptr = NULL;
-    long val = strtol(line, &endptr, 10);
-    while(endptr && *endptr != '\0' && isspace((unsigned char)*endptr)) {
-        endptr++;
+    char* endPointer = NULL;
+    long parsedValue = strtol(line, &endPointer, 10);
+    while(endPointer && *endPointer != '\0' && isspace((unsigned char)*endPointer)) {
+        endPointer++;
     }
 
-    bool ok = (*endptr == '\0' && val >= min && val <= max);
-    if(ok) {
-        *result = (int)val;
+    bool isConversionValid = (*endPointer == '\0' && parsedValue >= min && parsedValue <= max);
+    if(isConversionValid) {
+        *result = (int)parsedValue;
     }
 
     free(line);
-    return ok;
+    return isConversionValid;
 }
-
 
 bool readFloat(float* result, float min, float max) {
     if(result == NULL) return false;
@@ -142,21 +136,20 @@ bool readFloat(float* result, float min, float max) {
         return false;
     }
 
-    char* endptr = NULL;
-    float val = strtof(line, &endptr);
-    while(endptr && *endptr != '\0' && isspace((unsigned char)*endptr)) {
-        endptr++;
+    char* endPointer = NULL;
+    float parsedValue = strtof(line, &endPointer);
+    while(endPointer && *endPointer != '\0' && isspace((unsigned char)*endPointer)) {
+        endPointer++;
     }
 
-    bool ok = (endptr != line && *endptr == '\0' && val >= min && val <= max);
-    if(ok) {
-        *result = val;
+    bool isConversionValid = (endPointer != line && *endPointer == '\0' && parsedValue >= min && parsedValue <= max);
+    if(isConversionValid) {
+        *result = parsedValue;
     }
 
     free(line);
-    return ok;
+    return isConversionValid;
 }
-
 
 bool readString(char* buffer, int maxLen) {
     if(buffer == NULL || maxLen <= 0) return false;
@@ -178,7 +171,6 @@ bool readString(char* buffer, int maxLen) {
     return false;
 }
 
-
 int promptAndReadInt(const char* prompt, int min, int max) {
     int result;
     printf("%s", prompt);
@@ -191,7 +183,6 @@ int promptAndReadInt(const char* prompt, int min, int max) {
     return result;
 }
 
-
 float promptAndReadFloat(const char* prompt, float min, float max) {
     float result;
     printf("%s", prompt);
@@ -203,7 +194,6 @@ float promptAndReadFloat(const char* prompt, float min, float max) {
 
     return result;
 }
-
 
 char* promptAndReadString(const char* prompt, int maxLen) {
     if(maxLen <= 0) return NULL;
